@@ -322,6 +322,108 @@ D. kube-scheduler が停止している
 
 ---
 
+## ⑪ kubeconfig / クラスタ接続
+
+### Q21
+
+複数クラスタを管理する環境で、**特定の kubeconfig を使用するコマンド** として正しいものはどれか
+
+A. kubectl config use-context
+B. export KUBECONFIG=/path/to/config
+C. kubectl set-context
+D. kubectl config view
+
+👉 **ポイント**：
+
+* `export KUBECONFIG=...` で環境変数を設定、または `--kubeconfig` フラグで指定
+* `use-context` は同一ファイル内のコンテキスト切り替え
+
+---
+
+### Q22
+
+control-plane 障害時に kubectl が動作しない場合、**最初に確認すべきこと** はどれか
+
+A. kubelet の状態
+B. KUBECONFIG の設定
+C. kube-proxy の状態
+D. CNI の設定
+
+👉 **ポイント**：
+
+* API に接続できない場合は kubeconfig の設定ミスが多い
+* `export KUBECONFIG=/etc/kubernetes/admin.conf` で明示的に指定
+
+---
+
+## ⑫ Node ラベル / スケジューリング
+
+### Q23
+
+Node にラベルを追加するコマンドとして **正しいもの** はどれか
+
+A. kubectl annotate node <node> key=value
+B. kubectl label node <node> key=value
+C. kubectl taint node <node> key=value
+D. kubectl patch node <node> -p '{"labels":{"key":"value"}}'
+
+👉 **ポイント**：
+
+* `label` = スケジューリング（nodeSelector）で使用
+* `annotate` = メタデータ（ツール連携等）
+* `taint` = Pod の排除制御
+
+---
+
+### Q24
+
+`kubectl get nodes --show-labels` で **確認できないもの** はどれか
+
+A. kubernetes.io/hostname
+B. node-role.kubernetes.io/control-plane
+C. Node の Taints
+D. topology.kubernetes.io/zone
+
+👉 **ポイント**：
+
+* `--show-labels` はラベルのみ表示、Taints は `describe node` で確認
+
+---
+
+## ⑬ コントロールプレーン確認
+
+### Q25
+
+kube-system namespace の Pod を確認するコマンドとして **最も適切なもの** はどれか
+
+A. kubectl get pods
+B. kubectl get pods -n kube-system
+C. kubectl get pods --all-namespaces | grep kube
+D. kubectl describe namespace kube-system
+
+👉 **ポイント**：
+
+* control-plane コンポーネントは `kube-system` に配置
+* 障害調査の基本中の基本
+
+---
+
+### Q26
+
+`kubectl get componentstatuses` で **確認できるもの** はどれか
+
+A. kubelet の状態
+B. scheduler, controller-manager, etcd の状態
+C. kube-proxy の状態
+D. CoreDNS の状態
+
+👉 **ポイント**：
+
+* componentstatuses（cs）で control-plane の死活確認
+* ただし非推奨化が進んでいるため `get pods -n kube-system` も併用
+
+---
+
 ## 使い方
 
 * **各問題で「なぜその選択肢が正解/不正解か」を説明できるか確認**
@@ -332,11 +434,12 @@ D. kube-scheduler が停止している
 
 ## CKA 頻出コマンド一覧
 
+### 🥇 Sランク（反射で打つ）
+
 ```bash
-# クラスタアップグレード
+# kubeadm アップグレード
 kubeadm upgrade plan
 kubeadm upgrade apply v1.xx.x
-systemctl restart kubelet
 
 # etcd バックアップ
 ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
@@ -349,18 +452,48 @@ ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
 ETCDCTL_API=3 etcdctl snapshot restore /backup/etcd-snapshot.db \
   --data-dir=/var/lib/etcd-restore
 
-# 証明書確認
-kubeadm certs check-expiration
-
 # Node メンテナンス
 kubectl cordon <node>
 kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 kubectl uncordon <node>
 
-# kubelet トラブルシューティング
-systemctl status kubelet
-journalctl -u kubelet -f
-
 # Static Pod 確認
 ls /etc/kubernetes/manifests/
+
+# kubeconfig 切り替え（control-plane障害時に必須）
+export KUBECONFIG=/etc/kubernetes/admin.conf
+```
+
+### 🥈 Aランク（迷わず思い出す）
+
+```bash
+# 証明書確認
+kubeadm certs check-expiration
+
+# kube-system コンポーネント確認
+kubectl get pods -n kube-system
+kubectl describe pod <pod> -n kube-system
+
+# Node ラベル確認・操作
+kubectl get nodes --show-labels
+kubectl label node <node> key=value
+
+# kubelet トラブルシューティング
+systemctl status kubelet
+systemctl restart kubelet
+journalctl -u kubelet -f
+```
+
+### 🥉 Bランク（知っていればOK）
+
+```bash
+# コンポーネント状態確認（非推奨化進行中）
+kubectl get componentstatuses
+kubectl get cs
+
+# クラスタ情報
+kubectl cluster-info
+
+# kubelet 設定パス確認
+ps aux | grep kubelet
 ```

@@ -30,6 +30,29 @@ cat /etc/kubernetes/manifests/etcd.yaml | grep -E "(cert|key|ca)"
 --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
 ```
 
+```
+pos/CK/CKA$   kind get clustersrs
+  docker ps | grep cka
+cka
+3416a599e0d9   kindest/node:v1.27.3   "/usr/local/bin/entr…"   About an hour ago   Up About an hour   127.0.0.1:36483->6443/tcp   cka-control-plane
+53cccfede788   kindest/node:v1.27.3   "/usr/local/bin/entr…"   About an hour ago   Up About an hour                               cka-worker
+f8411532e3e4   kindest/node:v1.27.3   "/usr/local/bin/entr…"   About an hour ago   Up About an hour                               cka-worker2
+ubuntu@DESKTOP-REF6HHU:~/repos/CK/CKA$   # Access the control plane container
+  docker exec -it cka-control-plane cat /etc/kubernetes/manifests/etcd.yaml | grep -E "(cert|key|ca)"
+    - --cert-file=/etc/kubernetes/pki/etcd/server.crt
+    - --client-cert-auth=true
+    - --key-file=/etc/kubernetes/pki/etcd/server.key
+    - --peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt
+    - --peer-client-cert-auth=true
+    - --peer-key-file=/etc/kubernetes/pki/etcd/peer.key
+    - --peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+    - --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+      name: etcd-certs
+  priorityClassName: system-node-critical
+    name: etcd-certs
+ubuntu@DESKTOP-REF6HHU:~/repos/CK/CKA$ 
+```
+
 ---
 
 ## バックアップ（snapshot save）

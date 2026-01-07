@@ -1,0 +1,35 @@
+# Q5: StorageClass/PV
+# PVC that is Pending due to StorageClass issue
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage-test
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: cka-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /tmp/cka-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cka-pvc
+  namespace: storage-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # Intentionally wrong storageClassName
+  storageClassName: wrong-class

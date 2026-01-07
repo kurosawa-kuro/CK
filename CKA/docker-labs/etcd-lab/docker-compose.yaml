@@ -1,0 +1,43 @@
+version: '3.8'
+
+# CKA etcd バックアップ・リストア演習環境
+# WSL + Docker Desktop で動作確認済み
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: cka-etcd
+    command:
+      - etcd
+      - --name=etcd-node
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://localhost:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://localhost:2380
+      - --initial-cluster=etcd-node=http://localhost:2380
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd-data:/etcd-data
+      - ./backup:/backup
+    environment:
+      - ETCDCTL_API=3
+
+  # etcdctl操作用コンテナ
+  etcd-client:
+    image: quay.io/coreos/etcd:v3.5.9
+    container_name: cka-etcd-client
+    entrypoint: /bin/sh
+    command: ["-c", "sleep infinity"]
+    volumes:
+      - ./backup:/backup
+    environment:
+      - ETCDCTL_API=3
+      - ETCDCTL_ENDPOINTS=http://etcd:2379
+    depends_on:
+      - etcd
+
+volumes:
+  etcd-data:

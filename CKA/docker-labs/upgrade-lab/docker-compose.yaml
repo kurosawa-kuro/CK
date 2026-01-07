@@ -1,0 +1,18 @@
+version: '3.8'
+
+# CKA クラスタアップグレード演習環境
+# kubeadmコマンドの練習用
+
+services:
+  # kubeadm操作練習用コンテナ
+  upgrade-simulator:
+    image: ubuntu:22.04
+    container_name: cka-upgrade-sim
+    entrypoint: /bin/bash
+    command: ["-c", "apt-get update && apt-get install -y curl apt-transport-https ca-certificates gnupg && sleep infinity"]
+    volumes:
+      - ./scripts:/scripts
+      - ./manifests:/etc/kubernetes/manifests
+    privileged: true
+    environment:
+      - DEBIAN_FRONTEND=noninteractive

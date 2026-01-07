@@ -1,0 +1,21 @@
+# Q9: Node Labels/Selector
+# Pod with nodeSelector that doesn't match any node
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: placement
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-pod
+  namespace: placement
+spec:
+  containers:
+  - name: cuda
+    image: nginx:alpine
+  nodeSelector:
+    # This label doesn't exist on any node
+    gpu: "true"
+    zone: "us-west-1a"

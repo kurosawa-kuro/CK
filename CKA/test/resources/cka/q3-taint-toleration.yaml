@@ -1,0 +1,19 @@
+# Q3: Node Taint/Toleration
+# Pod that needs toleration to be scheduled
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: taint-test
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: critical-pod
+  namespace: taint-test
+spec:
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - containerPort: 80

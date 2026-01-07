@@ -1,0 +1,34 @@
+# Q2: ClusterRole/ClusterRoleBinding
+# ServiceAccount that needs cluster-wide permissions
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rbac-test
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-viewer
+  namespace: rbac-test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubectl-pod
+  namespace: rbac-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubectl
+  template:
+    metadata:
+      labels:
+        app: kubectl
+    spec:
+      serviceAccountName: cluster-viewer
+      containers:
+      - name: kubectl
+        image: bitnami/kubectl:latest
+        command: ["sleep", "3600"]

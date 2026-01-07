@@ -1,0 +1,36 @@
+# Q7: Service Troubleshoot
+# Service with wrong selector
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: svc-debug
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+  namespace: svc-debug
+  labels:
+    app: backend
+    tier: api
+spec:
+  containers:
+  - name: nginx
+    image: nginx:alpine
+    ports:
+    - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: svc-debug
+spec:
+  selector:
+    # Intentionally wrong selector
+    app: backend-app
+    tier: web
+  ports:
+  - port: 80
+    targetPort: 80

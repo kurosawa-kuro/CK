@@ -101,7 +101,7 @@ volumes:
 
 ```bash
 # etcdのPod情報から証明書パスを取得
-kubectl describe pod etcd-controlplane -n kube-system | grep -E "(cert|key|ca)"
+kubectl describe pod etcd-cka-control-plane -n kube-system | grep -E "(cert|key|ca)"
 
 # または直接マニフェストを確認
 cat /etc/kubernetes/manifests/etcd.yaml

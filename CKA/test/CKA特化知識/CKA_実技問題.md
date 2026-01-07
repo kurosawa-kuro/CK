@@ -36,21 +36,21 @@ etcd: <version>
 
 ```bash
 # kube-apiserver のイメージ確認
-kubectl get pod kube-apiserver-controlplane -n kube-system -o jsonpath='{.spec.containers[0].image}'
+kubectl get pod kube-apiserver-cka-control-plane -n kube-system -o jsonpath='{.spec.containers[0].image}'
 
 # etcd のイメージ確認
-kubectl get pod etcd-controlplane -n kube-system -o jsonpath='{.spec.containers[0].image}'
+kubectl get pod etcd-cka-control-plane -n kube-system -o jsonpath='{.spec.containers[0].image}'
 
 # ファイルに保存
-echo "kube-apiserver: $(kubectl get pod kube-apiserver-controlplane -n kube-system -o jsonpath='{.spec.containers[0].image}')" > /opt/component-versions.txt
-echo "etcd: $(kubectl get pod etcd-controlplane -n kube-system -o jsonpath='{.spec.containers[0].image}')" >> /opt/component-versions.txt
+echo "kube-apiserver: $(kubectl get pod kube-apiserver-cka-control-plane -n kube-system -o jsonpath='{.spec.containers[0].image}')" > /opt/component-versions.txt
+echo "etcd: $(kubectl get pod etcd-cka-control-plane -n kube-system -o jsonpath='{.spec.containers[0].image}')" >> /opt/component-versions.txt
 ```
 
 ---------------------------------------------------------
 
 ## 問題 1-2: 静的Podの作成
 
-controlplane ノードに `static-web` という名前の静的Podを作成してください。
+cka-control-plane ノードに `static-web` という名前の静的Podを作成してください。
 
 - イメージ: `nginx:alpine`
 - ポート: 80
@@ -182,7 +182,7 @@ key: <path>
 
 ```bash
 # etcd Podの設定から確認
-kubectl describe pod etcd-controlplane -n kube-system | grep -E "(cert|key|ca)" | head -5
+kubectl describe pod etcd-cka-control-plane -n kube-system | grep -E "(cert|key|ca)" | head -5
 
 # または直接マニフェストから
 cat /etc/kubernetes/manifests/etcd.yaml | grep -E "(cert-file|key-file|trusted-ca-file)"
@@ -254,7 +254,7 @@ kubeadm upgrade plan
 kubeadm upgrade apply v1.30.0
 
 # 4. ノードをdrain
-kubectl drain controlplane --ignore-daemonsets
+kubectl drain cka-control-plane --ignore-daemonsets
 
 # 5. kubelet/kubectlアップグレード
 apt-mark unhold kubelet kubectl
@@ -266,7 +266,7 @@ systemctl daemon-reload
 systemctl restart kubelet
 
 # 7. ノードをuncordon
-kubectl uncordon controlplane
+kubectl uncordon cka-control-plane
 EOF
 ```
 
@@ -274,7 +274,7 @@ EOF
 
 ## 問題 3-3: ワーカーノードのアップグレード（シミュレーション）
 
-ワーカーノード `node01` を v1.30.0 にアップグレードする手順を
+ワーカーノード `cka-worker` を v1.30.0 にアップグレードする手順を
 `/opt/worker-upgrade-steps.txt` に記載してください。
 
 ---------------------------------------------------------
@@ -283,12 +283,12 @@ EOF
 
 ```bash
 cat <<'EOF' > /opt/worker-upgrade-steps.txt
-# ワーカーノード(node01)アップグレード手順
+# ワーカーノード(cka-worker)アップグレード手順
 
 # コントロールプレーンから実行:
-kubectl drain node01 --ignore-daemonsets
+kubectl drain cka-worker --ignore-daemonsets
 
-# node01上で実行:
+# cka-worker上で実行:
 apt-mark unhold kubeadm
 apt-get update && apt-get install -y kubeadm=1.30.0-00
 apt-mark hold kubeadm
@@ -303,7 +303,7 @@ systemctl daemon-reload
 systemctl restart kubelet
 
 # コントロールプレーンから実行:
-kubectl uncordon node01
+kubectl uncordon cka-worker
 EOF
 ```
 
@@ -313,7 +313,7 @@ EOF
 
 ## 問題 4-1: ノードのメンテナンス
 
-`node01` ノードをメンテナンスモードにしてください。
+`cka-worker` ノードをメンテナンスモードにしてください。
 - 新しいPodがスケジュールされないようにする
 - 既存のPodを安全に退避させる（DaemonSetは無視）
 
@@ -325,16 +325,16 @@ EOF
 
 ```bash
 # 1. ノードをdrain（cordon + Pod退避）
-kubectl drain node01 --ignore-daemonsets
+kubectl drain cka-worker --ignore-daemonsets
 
 # 確認
 kubectl get nodes
-# node01 は SchedulingDisabled になっている
+# cka-worker は SchedulingDisabled になっている
 
 # 2. メンテナンス作業を実施...
 
 # 3. ノードを通常状態に戻す
-kubectl uncordon node01
+kubectl uncordon cka-worker
 
 # 確認
 kubectl get nodes
@@ -344,7 +344,7 @@ kubectl get nodes
 
 ## 問題 4-2: Taintの設定
 
-`node01` に以下のTaintを追加してください:
+`cka-worker` に以下のTaintを追加してください:
 - key: `maintenance`
 - value: `true`
 - effect: `NoSchedule`
@@ -359,10 +359,10 @@ kubectl get nodes
 
 ```bash
 # 1. Taintを追加
-kubectl taint nodes node01 maintenance=true:NoSchedule
+kubectl taint nodes cka-worker maintenance=true:NoSchedule
 
 # 確認
-kubectl describe node node01 | grep Taint
+kubectl describe node cka-worker | grep Taint
 
 # 2. Tolerationを持つPodを作成
 cat <<EOF | kubectl apply -f -
@@ -381,14 +381,14 @@ spec:
     value: "true"
     effect: "NoSchedule"
   nodeSelector:
-    kubernetes.io/hostname: node01
+    kubernetes.io/hostname: cka-worker
 EOF
 
 # 確認
 kubectl get pod tolerant-pod -o wide
 
 # クリーンアップ（Taint削除）
-kubectl taint nodes node01 maintenance=true:NoSchedule-
+kubectl taint nodes cka-worker maintenance=true:NoSchedule-
 ```
 
 ---------------------------------------------------------
@@ -400,7 +400,7 @@ kubectl taint nodes node01 maintenance=true:NoSchedule-
 - イメージ: `nginx`
 - 条件: `disktype=ssd` のラベルを持つノードに**必ず**スケジュールされる
 
-まず `node01` に `disktype=ssd` ラベルを追加してから、Podを作成してください。
+まず `cka-worker` に `disktype=ssd` ラベルを追加してから、Podを作成してください。
 
 ---------------------------------------------------------
 
@@ -408,7 +408,7 @@ kubectl taint nodes node01 maintenance=true:NoSchedule-
 
 ```bash
 # 1. ノードにラベルを追加
-kubectl label nodes node01 disktype=ssd
+kubectl label nodes cka-worker disktype=ssd
 
 # 確認
 kubectl get nodes --show-labels | grep disktype
@@ -438,7 +438,7 @@ EOF
 kubectl get pod gpu-pod -o wide
 
 # クリーンアップ
-kubectl label nodes node01 disktype-
+kubectl label nodes cka-worker disktype-
 ```
 
 ---------------------------------------------------------
@@ -593,9 +593,9 @@ kubectl get pod broken-pod -n debug
 
 ## 問題 6-2: Node NotReady の調査
 
-`node01` が `NotReady` 状態になっています。原因を調査し、修正してください。
+`cka-worker` が `NotReady` 状態になっています。原因を調査し、修正してください。
 
-### 環境準備（node01上で実行）
+### 環境準備（cka-worker上で実行）
 ```bash
 # kubeletを停止してNotReady状態を作る
 sudo systemctl stop kubelet
@@ -608,13 +608,13 @@ sudo systemctl stop kubelet
 ```bash
 # 1. ノード状態確認
 kubectl get nodes
-# node01 が NotReady
+# cka-worker が NotReady
 
 # 2. ノード詳細確認
-kubectl describe node node01 | grep -A5 Conditions
+kubectl describe node cka-worker | grep -A5 Conditions
 
-# 3. node01 にSSH
-ssh node01
+# 3. cka-worker にアクセス（kindの場合はdocker exec）
+docker exec -it cka-worker /bin/bash
 
 # 4. kubelet状態確認
 systemctl status kubelet
@@ -633,7 +633,7 @@ systemctl status kubelet
 # 8. コントロールプレーンで確認
 exit
 kubectl get nodes
-# node01 が Ready になる
+# cka-worker が Ready になる
 ```
 
 ---------------------------------------------------------

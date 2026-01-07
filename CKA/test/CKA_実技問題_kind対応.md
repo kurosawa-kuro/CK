@@ -28,7 +28,7 @@ kind create cluster --name cka --config kind-config.yaml
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q1-node-maintenance.yaml
+kubectl apply -f test/resources/cka/q1-node-maintenance.yaml
 ```
 
 問題
@@ -198,7 +198,7 @@ Podは全てcka-worker2で動作。uncordon後も自動的には戻らない（�
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q2-cluster-rbac.yaml
+kubectl apply -f test/resources/cka/q2-cluster-rbac.yaml
 ```
 
 問題
@@ -373,7 +373,7 @@ roleRef:
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q3-taint-toleration.yaml
+kubectl apply -f test/resources/cka/q3-taint-toleration.yaml
 ```
 
 問題
@@ -559,7 +559,7 @@ kubectl taint nodes cka-worker dedicated=critical:NoSchedule-
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q4-daemonset.yaml
+kubectl apply -f test/resources/cka/q4-daemonset.yaml
 ```
 
 問題
@@ -721,7 +721,7 @@ tolerations:
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q5-storage.yaml
+kubectl apply -f test/resources/cka/q5-storage.yaml
 ```
 
 問題
@@ -881,7 +881,7 @@ persistentvolumeclaim/cka-pvc   Bound    cka-pv   1Gi        RWO            manu
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q6-resourcequota.yaml
+kubectl apply -f test/resources/cka/q6-resourcequota.yaml
 ```
 
 問題
@@ -1071,7 +1071,7 @@ requests.memory  192Mi  256Mi
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q7-service-troubleshoot.yaml
+kubectl apply -f test/resources/cka/q7-service-troubleshoot.yaml
 ```
 
 問題
@@ -1244,7 +1244,7 @@ kubectl run test-pod --rm -it --image=busybox --restart=Never -n svc-debug -- wg
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q8-dns-troubleshoot.yaml
+kubectl apply -f test/resources/cka/q8-dns-troubleshoot.yaml
 ```
 
 問題
@@ -1420,7 +1420,7 @@ kubectl exec -n dns-test dns-client -- nslookup test-svc
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q9-node-selector.yaml
+kubectl apply -f test/resources/cka/q9-node-selector.yaml
 ```
 
 問題
@@ -1592,7 +1592,7 @@ kubectl get nodes -l gpu=true
 次のコマンドを実行して、問題に必要なリソースを作成して下さい。
 
 ```bash
-kubectl apply -f resources/cka/q10-events.yaml
+kubectl apply -f test/resources/cka/q10-events.yaml
 ```
 
 問題

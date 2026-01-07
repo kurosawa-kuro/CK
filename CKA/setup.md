@@ -2,7 +2,7 @@
 # 1. kind クラスタの再作成（CKA用）
 # =========================================
 kind delete cluster --name cka
-kind create cluster --name cka
+kind create cluster --name cka --config kind-config.yaml
 sleep 30
 kubectl get nodes
 

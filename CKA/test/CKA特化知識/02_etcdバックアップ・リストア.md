@@ -5,6 +5,14 @@
 etcdはKubernetesクラスタの全状態を保存する**唯一の永続ストア**。
 バックアップ・リストアは**CKA試験の最頻出問題**。
 
+### 実技問題との対応
+
+| 試験項目 | 使用する知識 |
+|---------|------------|
+| CKA試験 | etcdctl snapshot save/restore、証明書パス確認、マニフェスト編集 |
+
+**注意**: kindクラスタではetcdに直接アクセスできないため、コマンド構築と理解確認が中心
+
 ---
 
 ## 必須環境変数
@@ -329,3 +337,301 @@ docker compose down -v
 ```
 
 詳細な演習手順は [docker-labs/etcd-lab/README.md](../../docker-labs/etcd-lab/README.md) を参照
+
+---
+
+## 段階的ハンズオン（実技問題への橋渡し）
+
+### レベル1: 基礎（etcd確認とコマンド理解）
+
+kindクラスタではetcdに直接アクセスできないため、docker exec経由で確認します。
+
+#### 演習1-1: etcd Podの確認
+
+```bash
+# etcd Podの確認
+kubectl get pods -n kube-system | grep etcd
+
+# etcd Podの詳細
+kubectl describe pod -n kube-system etcd-cka-control-plane | head -50
+```
+
+**確認ポイント:**
+- etcdは静的Podとして動作
+- コントロールプレーンノードで稼働
+
+#### 演習1-2: etcd.yamlマニフェストの確認（kind環境）
+
+```bash
+# etcd.yamlの内容をdocker exec経由で確認
+docker exec cka-control-plane cat /etc/kubernetes/manifests/etcd.yaml
+
+# 証明書パスの抽出
+docker exec cka-control-plane cat /etc/kubernetes/manifests/etcd.yaml | grep -E "(cert|key|ca)"
+```
+
+**出力例と読み方:**
+```
+--cert-file=/etc/kubernetes/pki/etcd/server.crt    ← --cert に使う
+--key-file=/etc/kubernetes/pki/etcd/server.key     ← --key に使う
+--trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt  ← --cacert に使う
+```
+
+#### 演習1-3: コマンドオプションの理解
+
+以下の質問に答えてください:
+
+1. `ETCDCTL_API=3` は何のため？
+2. `--endpoints` には何を指定する？
+3. `--cacert`, `--cert`, `--key` の違いは？
+
+<details>
+<summary>解答</summary>
+
+1. **ETCDCTL_API=3**: etcdctl v3 APIを使用するため。v2とv3でコマンド形式が異なる
+2. **--endpoints**: etcdサーバーのアドレス（通常 https://127.0.0.1:2379）
+3. 証明書の種類:
+   - `--cacert`: CA証明書（信頼の基点）
+   - `--cert`: クライアント証明書（自分を証明）
+   - `--key`: クライアント秘密鍵（認証用）
+
+</details>
+
+---
+
+### レベル2: 応用（コマンド構築練習）
+
+#### 演習2-1: バックアップコマンドの構築
+
+etcd.yamlから証明書パスを確認し、バックアップコマンドを組み立てる練習です。
+
+```bash
+# Step 1: 証明書パスを確認
+docker exec cka-control-plane cat /etc/kubernetes/manifests/etcd.yaml | grep -E "(-cert|-key|-ca)"
+
+# Step 2: 以下のテンプレートを埋める
+# ETCDCTL_API=3 etcdctl snapshot save /backup/snapshot.db \
+#   --endpoints=https://127.0.0.1:2379 \
+#   --cacert=__________  \
+#   --cert=__________  \
+#   --key=__________
+```
+
+<details>
+<summary>解答</summary>
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot save /backup/snapshot.db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+```
+
+</details>
+
+#### 演習2-2: リストアコマンドの構築
+
+```bash
+# リストアコマンドのテンプレートを埋める
+# ETCDCTL_API=3 etcdctl snapshot restore /backup/snapshot.db \
+#   --data-dir=__________
+```
+
+<details>
+<summary>解答</summary>
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot restore /backup/snapshot.db \
+  --data-dir=/var/lib/etcd-restored
+```
+
+リストアには証明書オプションは不要（ローカルファイル操作のため）
+
+</details>
+
+#### 演習2-3: マニフェスト編集ポイントの理解
+
+リストア後に編集が必要な箇所を確認:
+
+```bash
+# etcd.yamlの data-dir 関連箇所を確認
+docker exec cka-control-plane cat /etc/kubernetes/manifests/etcd.yaml | grep -A 2 -B 2 "data-dir"
+docker exec cka-control-plane cat /etc/kubernetes/manifests/etcd.yaml | grep -A 5 "hostPath"
+```
+
+**編集が必要な箇所:**
+1. `--data-dir=/var/lib/etcd` → `/var/lib/etcd-restored`
+2. `volumes.hostPath.path: /var/lib/etcd` → `/var/lib/etcd-restored`
+
+---
+
+### レベル3: 実技問題準備
+
+#### 演習3-1: フルフロー理解確認
+
+以下の手順を紙に書いてみてください:
+
+1. バックアップの手順（3ステップ）
+2. リストアの手順（4ステップ）
+
+<details>
+<summary>解答</summary>
+
+**バックアップ手順:**
+1. etcd.yamlから証明書パスを確認
+2. etcdctl snapshot save コマンドを実行
+3. snapshot status で確認
+
+**リストア手順:**
+1. etcdctl snapshot restore を新しいdata-dirに実行
+2. etcd.yaml の --data-dir を変更
+3. etcd.yaml の volumes.hostPath.path を変更
+4. 保存してetcd再起動を待つ（kubeletが自動で再起動）
+
+</details>
+
+#### 演習3-2: コマンド書き取り練習
+
+以下のコマンドを暗記用に3回書いてみてください:
+
+```bash
+# バックアップコマンド（書いてみる）
+
+
+
+
+# リストアコマンド（書いてみる）
+
+
+
+```
+
+<details>
+<summary>解答</summary>
+
+```bash
+# バックアップ
+ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+
+# リストア
+ETCDCTL_API=3 etcdctl snapshot restore /backup/etcd-snapshot.db \
+  --data-dir=/var/lib/etcd-restored
+```
+
+</details>
+
+#### 演習3-3: トラブルシューティング理解
+
+以下のエラーが出た場合の対処法を答えてください:
+
+1. `Error: context deadline exceeded`
+2. `Error: x509: certificate signed by unknown authority`
+3. リストア後にAPI Serverが起動しない
+
+<details>
+<summary>解答</summary>
+
+1. **context deadline exceeded**
+   - 原因: endpointに到達できない
+   - 対処: `--endpoints=https://127.0.0.1:2379` を確認（httpsを忘れない）
+
+2. **x509: certificate signed by unknown authority**
+   - 原因: 証明書パスが間違っている
+   - 対処: etcd.yamlから正確なパスをコピー
+
+3. **API Server起動しない**
+   - 原因: data-dirのパスがマニフェストと一致していない
+   - 対処:
+     - `--data-dir` の値を確認
+     - `volumes.hostPath.path` の値を確認
+     - 両方を同じパスに設定
+
+</details>
+
+---
+
+## チートシート
+
+### 証明書パス確認
+
+```bash
+# etcd.yamlから証明書パスを抽出
+cat /etc/kubernetes/manifests/etcd.yaml | grep -E "(cert|key|ca)"
+
+# または kubectl describe で
+kubectl describe pod -n kube-system etcd-<node-name> | grep -E "(cert|key|ca)"
+```
+
+### バックアップ（コピペ用）
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot save /backup/etcd-snapshot.db \
+  --endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key
+```
+
+### リストア（コピペ用）
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot restore /backup/etcd-snapshot.db \
+  --data-dir=/var/lib/etcd-restored
+```
+
+### スナップショット確認
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot status /backup/etcd-snapshot.db --write-out=table
+```
+
+### マニフェスト編集箇所
+
+```yaml
+# /etc/kubernetes/manifests/etcd.yaml
+
+# 1. data-dir を変更
+- --data-dir=/var/lib/etcd-restored
+
+# 2. volumes.hostPath.path を変更
+volumes:
+- hostPath:
+    path: /var/lib/etcd-restored
+```
+
+### 証明書パス（デフォルト）
+
+```
+/etc/kubernetes/pki/etcd/
+├── ca.crt          # --cacert
+├── server.crt      # --cert
+└── server.key      # --key
+```
+
+### 変数化テクニック（試験で便利）
+
+```bash
+# 証明書オプションを変数化
+ETCD_OPTS="--endpoints=https://127.0.0.1:2379 \
+  --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+  --cert=/etc/kubernetes/pki/etcd/server.crt \
+  --key=/etc/kubernetes/pki/etcd/server.key"
+
+# 使用例
+ETCDCTL_API=3 etcdctl $ETCD_OPTS snapshot save /backup/snap.db
+ETCDCTL_API=3 etcdctl $ETCD_OPTS endpoint health
+```
+
+### エラー対処早見表
+
+| エラー | 原因 | 対処 |
+|-------|-----|------|
+| context deadline exceeded | endpoint到達不可 | https://確認 |
+| x509 certificate error | 証明書パス間違い | etcd.yamlからコピー |
+| API Server起動しない | data-dir不一致 | マニフェスト2箇所確認 |
+| etcdctl not found | etcdctlがない | apt install etcd-client |

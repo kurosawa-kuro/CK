@@ -5,6 +5,12 @@
 RBACは「誰が」「何に対して」「何ができるか」を制御する仕組み。
 CKA試験では**作成・修正・トラブルシューティング**が頻出。
 
+### 実技問題との対応
+
+| 実技問題 | 使用する知識 |
+|---------|------------|
+| 問題2: ClusterRole/ClusterRoleBinding | ClusterRole作成、ClusterRoleBinding作成、ServiceAccountとの紐付け |
+
 ---
 
 ## RBACの4つのリソース
@@ -496,4 +502,418 @@ kubectl auth can-i get nodes --as system:serviceaccount:rbac-demo:demo-sa
 kubectl delete namespace rbac-demo
 kubectl delete clusterrole node-viewer
 kubectl delete clusterrolebinding node-viewer-binding
+```
+
+---
+
+## 段階的ハンズオン（実技問題への橋渡し）
+
+### レベル1: 基礎（各リソースの理解）
+
+#### 演習1-1: Role の作成と確認
+
+```bash
+# 準備
+kubectl create namespace rbac-basic
+
+# 1. Role作成
+kubectl create role pod-reader \
+  --verb=get,list,watch \
+  --resource=pods \
+  -n rbac-basic
+
+# 2. 内容確認
+kubectl describe role pod-reader -n rbac-basic
+
+# 出力の読み方:
+# Resources: pods（対象リソース）
+# Verbs: get, list, watch（許可される操作）
+
+# 3. YAML形式で確認
+kubectl get role pod-reader -n rbac-basic -o yaml
+```
+
+**理解ポイント:**
+- `apiGroups: [""]` は core API（pods, services等）
+- verbs は許可する操作の種類
+
+#### 演習1-2: ClusterRole の作成と確認
+
+```bash
+# 1. ClusterRole作成（ノード読み取り）
+kubectl create clusterrole node-reader \
+  --verb=get,list,watch \
+  --resource=nodes
+
+# 2. 内容確認
+kubectl describe clusterrole node-reader
+
+# 3. ClusterRoleとRoleの違いを確認
+kubectl get role -A | head -10
+kubectl get clusterrole | head -10
+
+# クリーンアップ
+kubectl delete clusterrole node-reader
+```
+
+**理解ポイント:**
+- ClusterRole は Namespace に属さない
+- nodes は Namespace リソースではないので ClusterRole が必要
+
+#### 演習1-3: ServiceAccount の作成
+
+```bash
+# 1. ServiceAccount作成
+kubectl create serviceaccount test-sa -n rbac-basic
+
+# 2. 確認
+kubectl get sa -n rbac-basic
+
+# 3. 詳細確認
+kubectl describe sa test-sa -n rbac-basic
+```
+
+**理解ポイント:**
+- ServiceAccount は Pod に紐付けて使用
+- デフォルトで各 Namespace に `default` SA がある
+
+---
+
+### レベル2: 応用（紐付けと権限確認）
+
+#### 演習2-1: RoleBinding の作成と権限確認
+
+```bash
+# 1. Role作成（まだなければ）
+kubectl create role pod-reader \
+  --verb=get,list,watch \
+  --resource=pods \
+  -n rbac-basic 2>/dev/null || true
+
+# 2. RoleBinding作成（SAにRoleを紐付け）
+kubectl create rolebinding test-binding \
+  --role=pod-reader \
+  --serviceaccount=rbac-basic:test-sa \
+  -n rbac-basic
+
+# 3. 権限確認（can-i）
+# 権限あり
+kubectl auth can-i get pods \
+  --as system:serviceaccount:rbac-basic:test-sa \
+  -n rbac-basic
+# 出力: yes
+
+# 権限なし（deleteは許可していない）
+kubectl auth can-i delete pods \
+  --as system:serviceaccount:rbac-basic:test-sa \
+  -n rbac-basic
+# 出力: no
+
+# 権限なし（別Namespaceは不可）
+kubectl auth can-i get pods \
+  --as system:serviceaccount:rbac-basic:test-sa \
+  -n default
+# 出力: no
+```
+
+**理解ポイント:**
+- `--as system:serviceaccount:<namespace>:<sa-name>` で SA として権限確認
+- RoleBinding は そのNamespace内のみ有効
+
+#### 演習2-2: ClusterRoleBinding の作成と権限確認
+
+```bash
+# 1. ClusterRole作成
+kubectl create clusterrole pod-reader-cluster \
+  --verb=get,list,watch \
+  --resource=pods
+
+# 2. ClusterRoleBinding作成
+kubectl create clusterrolebinding test-cluster-binding \
+  --clusterrole=pod-reader-cluster \
+  --serviceaccount=rbac-basic:test-sa
+
+# 3. 権限確認（全Namespaceで有効）
+kubectl auth can-i get pods \
+  --as system:serviceaccount:rbac-basic:test-sa \
+  -n default
+# 出力: yes
+
+kubectl auth can-i get pods \
+  --as system:serviceaccount:rbac-basic:test-sa \
+  -n kube-system
+# 出力: yes
+
+# クリーンアップ
+kubectl delete clusterrole pod-reader-cluster
+kubectl delete clusterrolebinding test-cluster-binding
+```
+
+**理解ポイント:**
+- ClusterRoleBinding は 全Namespace で有効
+- 同じ ClusterRole を RoleBinding で使うと、そのNamespace内のみ有効になる
+
+#### 演習2-3: 全権限の一覧表示
+
+```bash
+# 自分の権限一覧
+kubectl auth can-i --list
+
+# 特定SAの権限一覧
+kubectl auth can-i --list \
+  --as system:serviceaccount:rbac-basic:test-sa \
+  -n rbac-basic
+```
+
+**理解ポイント:**
+- `--list` で許可されている全操作を確認できる
+- トラブルシューティング時に便利
+
+---
+
+### レベル3: 実技問題準備
+
+#### 演習3-1: 問題2シミュレーション（ClusterRole + ClusterRoleBinding）
+
+```bash
+# 環境準備
+kubectl create namespace rbac-test
+
+# ServiceAccount作成
+kubectl create serviceaccount cluster-viewer -n rbac-test
+
+# kubectl Podを作成（SA指定）
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubectl-pod
+  namespace: rbac-test
+spec:
+  serviceAccountName: cluster-viewer
+  containers:
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command: ["sleep", "infinity"]
+EOF
+
+# Pod起動待ち
+sleep 10
+
+# === 権限がない状態を確認 ===
+kubectl exec -n rbac-test kubectl-pod -- kubectl get pods -A 2>&1 | head -3
+# Error from server (Forbidden)...
+
+kubectl exec -n rbac-test kubectl-pod -- kubectl get nodes 2>&1 | head -3
+# Error from server (Forbidden)...
+
+# === 問題開始 ===
+# タスク1: ClusterRole作成（pods, nodes の get,list,watch）
+kubectl create clusterrole pod-node-reader \
+  --verb=get,list,watch \
+  --resource=pods,nodes
+
+# タスク2: ClusterRoleBinding作成
+kubectl create clusterrolebinding cluster-viewer-binding \
+  --clusterrole=pod-node-reader \
+  --serviceaccount=rbac-test:cluster-viewer
+
+# === 確認 ===
+# Pod一覧取得（成功するはず）
+kubectl exec -n rbac-test kubectl-pod -- kubectl get pods -A
+
+# Node一覧取得（成功するはず）
+kubectl exec -n rbac-test kubectl-pod -- kubectl get nodes
+
+# クリーンアップ
+kubectl delete namespace rbac-test
+kubectl delete clusterrole pod-node-reader
+kubectl delete clusterrolebinding cluster-viewer-binding
+```
+
+#### 演習3-2: トラブルシューティング練習
+
+```bash
+# 環境準備
+kubectl create namespace rbac-debug
+kubectl create serviceaccount debug-sa -n rbac-debug
+
+# 意図的に間違ったRoleBindingを作成
+kubectl create role secret-reader \
+  --verb=get,list \
+  --resource=secrets \
+  -n rbac-debug
+
+# 間違い: namespace を間違えて指定
+kubectl create rolebinding wrong-binding \
+  --role=secret-reader \
+  --serviceaccount=default:debug-sa \
+  -n rbac-debug
+
+# === トラブルシューティング開始 ===
+
+# 1. 権限確認（失敗するはず）
+kubectl auth can-i get secrets \
+  --as system:serviceaccount:rbac-debug:debug-sa \
+  -n rbac-debug
+# 出力: no
+
+# 2. RoleBindingの内容確認
+kubectl describe rolebinding wrong-binding -n rbac-debug | grep -A 5 Subjects
+# Subjects:
+#   Kind   Name       Namespace
+#   ----   ----       ---------
+#   ServiceAccount  debug-sa   default   <-- ここが間違い！
+
+# 3. 修正: RoleBindingを削除して正しく作り直す
+kubectl delete rolebinding wrong-binding -n rbac-debug
+
+kubectl create rolebinding correct-binding \
+  --role=secret-reader \
+  --serviceaccount=rbac-debug:debug-sa \
+  -n rbac-debug
+
+# 4. 再確認
+kubectl auth can-i get secrets \
+  --as system:serviceaccount:rbac-debug:debug-sa \
+  -n rbac-debug
+# 出力: yes
+
+# クリーンアップ
+kubectl delete namespace rbac-debug
+```
+
+**よくあるミス:**
+- ServiceAccount の namespace 指定ミス（`default:sa` vs `rbac-debug:sa`）
+- Role と ClusterRole の混同
+- RoleBinding で ClusterRole を使う時の roleRef.kind 指定
+
+#### 演習3-3: 複数リソースへの権限付与
+
+```bash
+# 環境準備
+kubectl create namespace multi-rbac
+kubectl create serviceaccount multi-sa -n multi-rbac
+
+# 複数リソースへの権限を持つClusterRole作成
+cat <<EOF | kubectl apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: multi-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+EOF
+
+# ClusterRoleBinding作成
+kubectl create clusterrolebinding multi-binding \
+  --clusterrole=multi-reader \
+  --serviceaccount=multi-rbac:multi-sa
+
+# 確認
+kubectl auth can-i get pods \
+  --as system:serviceaccount:multi-rbac:multi-sa
+kubectl auth can-i get deployments \
+  --as system:serviceaccount:multi-rbac:multi-sa
+kubectl auth can-i get nodes \
+  --as system:serviceaccount:multi-rbac:multi-sa
+# pods, deployments は yes、nodes は no
+
+# クリーンアップ
+kubectl delete namespace multi-rbac
+kubectl delete clusterrole multi-reader
+kubectl delete clusterrolebinding multi-binding
+```
+
+---
+
+## チートシート
+
+### Role/ClusterRole 作成
+
+```bash
+# Role（Namespace内）
+kubectl create role <name> --verb=get,list,watch --resource=pods -n <ns>
+
+# ClusterRole（クラスタ全体）
+kubectl create clusterrole <name> --verb=get,list,watch --resource=pods,nodes
+```
+
+### RoleBinding/ClusterRoleBinding 作成
+
+```bash
+# RoleBinding（SAに紐付け）
+kubectl create rolebinding <name> \
+  --role=<role-name> \
+  --serviceaccount=<namespace>:<sa-name> \
+  -n <namespace>
+
+# ClusterRoleBinding（SAに紐付け）
+kubectl create clusterrolebinding <name> \
+  --clusterrole=<clusterrole-name> \
+  --serviceaccount=<namespace>:<sa-name>
+
+# RoleBindingでClusterRoleを使う（そのNS内のみ有効）
+kubectl create rolebinding <name> \
+  --clusterrole=<clusterrole-name> \
+  --serviceaccount=<namespace>:<sa-name> \
+  -n <namespace>
+```
+
+### 権限確認（can-i）
+
+```bash
+# 自分の権限
+kubectl auth can-i <verb> <resource> -n <ns>
+
+# 他ユーザー/SAの権限
+kubectl auth can-i <verb> <resource> \
+  --as system:serviceaccount:<namespace>:<sa-name> \
+  -n <namespace>
+
+# 全権限一覧
+kubectl auth can-i --list \
+  --as system:serviceaccount:<namespace>:<sa-name>
+```
+
+### よく使うapiGroups
+
+| apiGroups | リソース |
+|-----------|---------|
+| `""` (core) | pods, services, secrets, configmaps, persistentvolumeclaims, nodes |
+| `apps` | deployments, replicasets, statefulsets, daemonsets |
+| `batch` | jobs, cronjobs |
+| `networking.k8s.io` | ingresses, networkpolicies |
+
+### ServiceAccount 指定形式
+
+```bash
+# コマンドでの指定
+--serviceaccount=<namespace>:<sa-name>
+
+# YAMLでの指定
+subjects:
+- kind: ServiceAccount
+  name: <sa-name>
+  namespace: <namespace>
+
+# can-i での指定
+--as system:serviceaccount:<namespace>:<sa-name>
+```
+
+### Role vs ClusterRole 選択フロー
+
+```
+対象リソースは Namespaced?
+├── Yes（pods, services, secrets等）
+│   └── 全Namespaceで必要？
+│       ├── Yes → ClusterRole + ClusterRoleBinding
+│       └── No  → Role + RoleBinding
+└── No（nodes, persistentvolumes等）
+    └── ClusterRole + ClusterRoleBinding
 ```
